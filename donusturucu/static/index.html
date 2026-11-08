@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dönüştürücü</title>
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#" data-nav="home">
+    <img src="/static/icon.svg" alt="" width="30" height="30">
+    <span>Dönüştürücü</span>
+  </a>
+  <div class="search"><input id="search" type="search" placeholder="Araç ara… (örn. birleştir, word, ses)" autocomplete="off"></div>
+  <button class="icon-btn" id="btn-settings" title="Ayarlar" aria-label="Ayarlar">⚙</button>
+</header>
+
+<main id="view"></main>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-box">
+    <button class="modal-x" aria-label="Kapat">×</button>
+    <div class="modal-body"></div>
+  </div>
+</div>
+<div id="toast" class="toast" hidden></div>
+
+<template id="tpl-home">
+  <section class="hero">
+    <h1>Tüm PDF ve dönüştürme araçlarınız, tek yerde</h1>
+    <p>Dosyalarınız bilgisayarınızdan çıkmadan işlenir. Bir araç seçin, dosyanızı sürükleyin.</p>
+    <nav class="chips" id="cats"></nav>
+  </section>
+  <section class="grid" id="tools"></section>
+</template>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
