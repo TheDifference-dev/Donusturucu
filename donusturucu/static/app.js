@@ -22,6 +22,13 @@ const store = {
 };
 
 let CAT = null, CATS = {}, S = null, CARRY = null;
+/* Masaüstü sürümünde (exe) indirme/açma yerel iletişim kutularıyla yapılır */
+const desk = () => window.pywebview && window.pywebview.api;
+async function saveOut(f) {
+  if (desk()) { const p = await desk().save_as(f.id, f.name); if (p) toast("Kaydedildi: " + p, 4500); return; }
+  const a = h("a", { href: `/api/download/${f.id}`, download: f.name }); document.body.append(a); a.click(); a.remove();
+}
+function openOut(f) { if (desk()) desk().open_file(f.id); else window.open(`/api/download/${f.id}?inline=1`, "_blank"); }
 
 async function api(path, body, method) {
   const r = await fetch(path, body === undefined ? { method: method || "GET" } : {
@@ -581,15 +588,15 @@ function renderResult(res) {
     const viewable = ["pdf", "html", "txt", "md", "png", "jpg"].includes(f.ext);
     list.append(h("div", { class: "file" }, h("div", { class: "ph" }, f.ext.toUpperCase()),
       h("div", { class: "nm" }, f.name, h("div", { class: "meta" }, fmtSize(f.size))),
-      viewable ? h("a", { class: "btn sm", href: `/api/download/${f.id}?inline=1`, target: "_blank" }, "Aç") : null,
+      viewable || desk() ? h("button", { class: "btn sm", onclick: () => openOut(f) }, "Aç") : null,
       h("button", { class: "btn sm", onclick: async () => { try { const r = await api(`/api/save/${f.id}`, { reveal: true }); toast("Kaydedildi: " + r.path, 4500); } catch (e) { toast(e.message); } } }, "Klasöre kaydet"),
-      h("a", { class: "btn sm primary", href: `/api/download/${f.id}` }, "İndir")));
+      h("button", { class: "btn sm primary", onclick: () => saveOut(f) }, desk() ? "Farklı kaydet…" : "İndir")));
   }
   const main = files[0];
   const panel = h("div", { class: "panel result" },
     h("div", { class: "ok" }, "✅"), h("h2", { style: { margin: "4px 0" } }, "Tamamlandı"),
     h("p", { class: "hint" }, `${res.seconds} saniyede işlendi · ${files.length} dosya`),
-    main ? h("a", { class: "btn primary big", style: { maxWidth: "420px" }, href: `/api/download/${(zip || main).id}` }, zip ? "Tümünü indir (ZIP)" : `${main.name} indir`) : null,
+    main ? h("button", { class: "btn primary big", style: { maxWidth: "420px" }, onclick: () => saveOut(zip || main) }, zip ? "Tümünü kaydet (ZIP)" : `${main.name} kaydet`) : null,
     res.note ? h("div", { class: "note" }, res.note) : null,
     res.text ? h("div", {}, h("div", { class: "textout" }, res.text), h("button", { class: "btn sm", onclick: () => navigator.clipboard.writeText(res.text).then(() => toast("Kopyalandı")) }, "Metni kopyala")) : null,
     res.html ? h("iframe", { class: "report", srcdoc: res.html, sandbox: "" }) : null,

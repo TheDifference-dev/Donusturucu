@@ -19,6 +19,11 @@ APP_NAME = "Dönüştürücü"
 SYSTEM = platform.system()  # 'Windows' | 'Darwin' | 'Linux'
 
 
+def resource_dir() -> Path:
+    """Paket kaynak klasörü (PyInstaller içinde de çalışır)."""
+    return Path(__file__).resolve().parent
+
+
 class ToolError(Exception):
     """Kullanıcıya gösterilecek, anlaşılır hata."""
 
