@@ -63,7 +63,7 @@ $VPyw = Join-Path $Venv 'Scripts\pythonw.exe'
 
 Adim 'Bağımlılıklar kuruluyor (ilk seferde birkaç dakika sürebilir)'
 & $VPy -m pip install --upgrade pip --disable-pip-version-check -q
-& $VPy -m pip install -r (Join-Path $App 'requirements.txt') --disable-pip-version-check -q
+& $VPy -m pip install -r (Join-Path $App 'requirements.txt') --disable-pip-version-check --progress-bar on
 if ($LASTEXITCODE -ne 0) { throw 'Paketler kurulamadı. İnternet bağlantısını kontrol edip tekrar deneyin.' }
 & $VPy -c "import pymupdf, pdf2docx, pikepdf, flask, waitress, imageio_ffmpeg; imageio_ffmpeg.get_ffmpeg_exe(); print('Bağımlılık kontrolü: OK')"
 if ($LASTEXITCODE -ne 0) { throw 'Kurulum doğrulaması başarısız.' }

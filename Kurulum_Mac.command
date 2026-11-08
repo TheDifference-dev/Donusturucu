@@ -37,7 +37,7 @@ find "$APP" -name "__pycache__" -type d -prune -exec rm -rf {} +
 step "Sanal ortam ve bağımlılıklar (ilk seferde birkaç dakika sürebilir)"
 [ -x "$VENV/bin/python" ] || "$PY" -m venv "$VENV"
 "$VENV/bin/python" -m pip install --upgrade pip -q --disable-pip-version-check
-"$VENV/bin/python" -m pip install -r "$APP/requirements.txt" -q --disable-pip-version-check
+"$VENV/bin/python" -m pip install -r "$APP/requirements.txt" --disable-pip-version-check
 "$VENV/bin/python" -c "import pymupdf, pdf2docx, pikepdf, flask, waitress, imageio_ffmpeg; imageio_ffmpeg.get_ffmpeg_exe(); print('Bağımlılık kontrolü: OK')"
 
 step "Masaüstü uygulaması oluşturuluyor"
