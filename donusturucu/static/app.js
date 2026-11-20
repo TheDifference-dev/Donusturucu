@@ -208,7 +208,8 @@ function fileRow(f, i, sortable) {
 function renderWork() {
   const w = $("#work"); w.innerHTML = "";
   const t = S.tool;
-  if (!S.files.length) { w.append(dropZone()); if (!t.optional_files) return; else return; }
+  if (t.ui === "url") return renderUrlTool(w);
+  if (!S.files.length) { w.append(dropZone()); return; }
   const ui = t.ui;
   if (ui === "organize") return renderOrganize(w);
   if (ui === "placer" || (ui === "forms" && S.opts.mode === "create")) return renderPlacer(w);
@@ -226,6 +227,23 @@ function renderWork() {
   if (t.camera) p.append(h("p", {}, h("button", { class: "btn sm", onclick: openCamera }, "📷 Kamerayla ekle")));
   const dz = dropZone(true); dz.style.marginTop = "14px"; dz.style.padding = "16px";
   if (t.multi) p.append(dz);
+}
+
+/* bağlantıdan indirme (YouTube vb.) */
+function renderUrlTool(w) {
+  const o = S.tool.opts.find((x) => x.main);
+  const ta = h("textarea", { class: "urlbox", placeholder: o.placeholder || "", rows: 4, spellcheck: "false",
+    oninput: (e) => { S.opts[o.key] = e.target.value; const b = $("#side .btn.big"); if (b) b.disabled = !e.target.value.trim() || null; } });
+  ta.value = S.opts[o.key] || "";
+  const paste = h("button", { class: "btn sm", onclick: async () => {
+    try { const t = await navigator.clipboard.readText(); ta.value = (ta.value.trim() ? ta.value.trim() + "\n" : "") + t.trim(); ta.dispatchEvent(new Event("input")); }
+    catch { toast("Panoya erişilemedi; Ctrl+V ile yapıştırın."); } } }, "📋 Panodan yapıştır");
+  w.append(h("div", { class: "panel" },
+    h("label", { class: "l", style: { fontWeight: 600 } }, o.label), ta,
+    h("div", { style: { display: "flex", gap: "8px", alignItems: "center", marginTop: "8px", flexWrap: "wrap" } }, paste,
+      h("span", { class: "hint" }, "YouTube, Instagram, X, Vimeo, Dailymotion ve 1000+ site desteklenir.")),
+    h("p", { class: "hint", style: { marginTop: "14px" } }, "⚖ Yalnızca indirme hakkınız olan içerikleri indirin (kendi videolarınız, izin verilen ya da telifsiz içerik). YouTube kullanım koşulları ve telif hakları geçerlidir.")));
+  setTimeout(() => ta.focus(), 30);
 }
 
 /* sayfa seçici (sayfaları kaldır / ayıkla / ayır önizleme) */
@@ -508,7 +526,7 @@ function renderSide() {
   const p = h("div", { class: "panel" }, h("h3", { style: { margin: "0 0 12px" } }, "Seçenekler"));
   const box = h("div", { class: "opts" });
   for (const o of t.opts) {
-    if (!visible(o)) continue;
+    if (!visible(o) || o.main) continue;
     box.append(optInput(o));
   }
   if (t.wm_image && S.opts.kind === "image") {
@@ -564,12 +582,22 @@ async function runTool() {
   const prev = [...w.childNodes]; const prevSide = [...side.childNodes];
   w.innerHTML = ""; side.innerHTML = "";
   const started = Date.now();
+  const jobId = Math.random().toString(36).slice(2) + Date.now().toString(36);
   const timer = h("span", { class: "hint" }, "");
-  const iv = setInterval(() => (timer.textContent = `${Math.round((Date.now() - started) / 1000)} sn`), 1000);
-  w.append(h("div", { class: "panel busy" }, h("div", { class: "spin" }), h("b", {}, "İşleniyor…"), timer,
+  const bar = h("div", { class: "bar", style: { maxWidth: "460px", display: "none" } }, h("i"));
+  const ptxt = h("p", { class: "hint", style: { margin: 0, textAlign: "center", maxWidth: "560px" } }, "");
+  const iv = setInterval(async () => {
+    timer.textContent = `${Math.round((Date.now() - started) / 1000)} sn`;
+    try {
+      const pr = await (await fetch(`/api/progress/${jobId}`)).json();
+      if (pr && pr.t) { ptxt.textContent = pr.t; }
+      if (pr && typeof pr.p === "number") { bar.style.display = ""; $("i", bar).style.width = (pr.p * 100).toFixed(1) + "%"; }
+    } catch {}
+  }, 1000);
+  w.append(h("div", { class: "panel busy" }, h("div", { class: "spin" }), h("b", {}, "İşleniyor…"), timer, bar, ptxt,
     h("p", { class: "hint" }, t.cat === "media" || t.id === "ocr" || t.cat === "ai" ? "Büyük dosyalarda birkaç dakika sürebilir." : "")));
   try {
-    const res = await api(`/api/run/${t.id}`, { file_ids: S.files.map((f) => f.id), opts, extra });
+    const res = await api(`/api/run/${t.id}`, { file_ids: S.files.map((f) => f.id), opts, extra, job_id: jobId });
     clearInterval(iv); renderResult(res);
   } catch (e) {
     clearInterval(iv);
@@ -605,7 +633,7 @@ function renderResult(res) {
   const pdfs = files.filter((f) => f.ext !== "zip" && f.ext !== "html");
   if (pdfs.length) {
     const ext = pdfs[0].ext;
-    const nexts = CAT.tools.filter((x) => x.id !== t.id && accepts(x, ext) && x.cat !== "media");
+    const nexts = CAT.tools.filter((x) => x.id !== t.id && accepts(x, ext) && x.ui !== "url");
     if (nexts.length) panel.append(h("div", { class: "next" }, h("b", {}, "Sonucu başka bir araçla işle:"),
       h("div", { class: "chips" }, ...nexts.map((x) => h("button", { class: "chip", onclick: () => { CARRY = pdfs.filter((f) => accepts(x, f.ext)); go("#/arac/" + x.id); } }, x.icon + " " + x.title)))));
   }
@@ -632,6 +660,12 @@ $("#btn-settings").onclick = async () => {
     row("Video → ses (ffmpeg)", st.ffmpeg), row("Microsoft Office", st.ms_office, "yok (Windows'ta Office ile dönüştürülür)"),
     row("LibreOffice", st.libreoffice, "yok (isteğe bağlı)"), row("Chrome / Edge (HTML→PDF)", st.tarayici),
     row("Ghostscript (tam PDF/A)", st.ghostscript, "yok (isteğe bağlı)"),
+    row(`YouTube indirici (yt-dlp ${st.indirici_surumu})`, st.js_ortami, "JS ortamı (deno) yok — bazı videolar inmeyebilir"),
+    h("p", {}, h("button", { class: "btn sm", onclick: async (e) => {
+      const b = e.target; b.disabled = true; b.textContent = "Kontrol ediliyor…";
+      try { const r = await api("/api/downloader/update", {}); toast(`İndirici: ${r.durum} (${r.surum})`, 5000); }
+      catch (err) { toast(err.message, 5000); }
+      b.disabled = false; b.textContent = "İndiriciyi güncelle"; } }, "İndiriciyi güncelle")),
     row("OCR dilleri", st.ocr_dilleri.length > 0, "ilk kullanımda iner"), row("Claude API anahtarı", st.claude_anahtari, "yok (özet/çeviri için isteğe bağlı)"),
     h("p", { class: "hint" }, `Sistem: ${st.isletim_sistemi}`),
     h("h4", {}, "Kayıt klasörü"), dir,

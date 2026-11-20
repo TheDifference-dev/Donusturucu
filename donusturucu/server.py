@@ -55,6 +55,9 @@ def create_app(store: FileStore | None = None) -> Flask:
     @app.get("/api/status")
     def status():
         c = capabilities()
+        from .download_tools import find_js_runtime, ytdlp_version
+        c["indirici_surumu"] = ytdlp_version()
+        c["js_ortami"] = bool(find_js_runtime())
         c["cikti_klasoru"] = str(default_output_dir())
         return jsonify(c)
 
@@ -133,9 +136,13 @@ def create_app(store: FileStore | None = None) -> Flask:
             inputs = [st.get(i).path for i in body.get("file_ids", [])]
             extra = {k: st.get(v).path for k, v in (body.get("extra") or {}).items() if v}
             out = st.new_workdir()
-            job = Job(inputs=inputs, opts=body.get("opts") or {}, out=out, store=st, extra=extra)
+            jid = str(body.get("job_id") or "")[:40] or None
+            job = Job(inputs=inputs, opts=body.get("opts") or {}, out=out, store=st, extra=extra, job_id=jid)
             t0 = time.time()
-            res = tool["fn"](job)
+            try:
+                res = tool["fn"](job)
+            finally:
+                core.PROGRESS.pop(jid or "", None)
             files = [st.add_path(p).public() for p in res.files]
             shutil.rmtree(out, ignore_errors=True)
             return jsonify(files=files, text=res.text, html=res.html, note=res.note,
@@ -145,6 +152,20 @@ def create_app(store: FileStore | None = None) -> Flask:
         except Exception as e:
             traceback.print_exc()
             return jsonify(error=f"Beklenmeyen hata: {type(e).__name__}: {e}"), 500
+
+    @app.post("/api/downloader/update")
+    def downloader_update():
+        from .download_tools import update_downloader
+        try:
+            return jsonify(update_downloader(force=True))
+        except ToolError as e:
+            return jsonify(error=str(e)), 400
+        except Exception as e:
+            return jsonify(error=f"Güncelleme denetlenemedi: {e}"), 502
+
+    @app.get("/api/progress/<jid>")
+    def progress(jid):
+        return jsonify(core.PROGRESS.get(jid) or {})
 
     @app.get("/api/download/<fid>")
     def download(fid):

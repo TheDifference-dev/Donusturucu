@@ -21,8 +21,9 @@ Sonra masaüstündeki simgeye çift tıklamanız yeterli. Uygulama kendi pencere
 
 **Kaldırmak için** yukarıdaki klasörü ve masaüstündeki kısayolu silin.
 
-## Araçlar (34)
+## Araçlar (35)
 
+- **YouTube'dan indir:** YouTube ve 1000+ siteden bağlantıyla video (MP4/MKV, 360p–4K) ya da ses (MP3, M4A, OPUS, FLAC, WAV) indirir. Oynatma listesi, altyazı ve kapak resmi desteklenir. İndirme motoru (yt-dlp) günde bir kez kendini günceller; Ayarlar'dan elle de güncellenebilir. YouTube "robot değilim" doğrulaması isterse "Tarayıcı çerezlerini kullan" seçeneğiyle oturum açık tarayıcı seçilir. Yalnızca indirme hakkınız olan içerikleri indirin.
 - **Video ve ses:** Videoyu sese dönüştürür (MP3, M4A, WAV, FLAC, OGG, OPUS, AAC). Kırpma, mono, normalize ve bit hızı ayarları var.
 - **PDF düzenle:** Birleştir, ayır (aralık, her N sayfa, tek tek ya da boyuta göre), sayfa kaldır, sayfa ayıkla, sırala/döndür/boş sayfa ekle, PDF'e tara (kamera ve otomatik kırpma).
 - **Optimize:** Küçült (3 düzey), onar, OCR (Türkçe dahil, dil dosyası ilk kullanımda iner).

@@ -314,3 +314,94 @@ def test_claude_request_shape(monkeypatch):
     assert ai._translate_batch(["Merhaba"], "en", True) == ["Hello"]
     assert seen["model"] == "claude-opus-5-5" and seen["fallbacks"] == "default"
     assert seen["output_config"]["format"]["type"] == "json_schema"
+
+
+# ---------------------------------------------------------------- bağlantıdan indirme (yt-dlp)
+@pytest.fixture(scope="module")
+def local_http(samples):
+    """Örnek videoyu yerel bir HTTP sunucusundan yayınlar (YouTube'a gerçek istek atmadan indirme hattını sınar)."""
+    import functools
+    import http.server
+    import threading
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(samples))
+    handler.log_message = lambda *a, **k: None
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{srv.server_address[1]}"
+    srv.shutdown()
+
+
+def test_media_download_video_and_audio(local_http, tmp_path, monkeypatch):
+    monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
+    url = f"{local_http}/klip.mp4"
+    r = run_tool("media_download", [], tmp_path, url=url, kind="video", quality="best", container="mp4", metadata=False)
+    assert r.files[0].suffix == ".mp4" and r.files[0].stat().st_size > 1000
+    probe = subprocess.run([core.find_ffmpeg(), "-i", str(r.files[0])], capture_output=True).stderr.decode()
+    assert "Video:" in probe and "Audio:" in probe
+    r = run_tool("media_download", [], tmp_path, url=url, kind="audio", audio_format="mp3", bitrate="128")
+    probe = subprocess.run([core.find_ffmpeg(), "-i", str(r.files[0])], capture_output=True).stderr.decode()
+    assert r.files[0].suffix == ".mp3" and "Audio: mp3" in probe and "Video:" not in probe.split("Stream #0:0")[1][:40]
+
+
+def test_media_download_progress_and_errors(local_http, tmp_path, monkeypatch):
+    monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
+    out = tmp_path / "p"; out.mkdir()
+    job = Job(inputs=[], opts={"url": f"{local_http}/klip.mp4", "kind": "audio", "audio_format": "m4a"}, out=out, job_id="t1")
+    events = []
+    orig = Job.progress
+    monkeypatch.setattr(Job, "progress", lambda self, p, t="": (events.append((p, t)), orig(self, p, t)))
+    BY_ID["media_download"]["fn"](job)
+    assert any("İndiriliyor" in t for _, t in events) and core.PROGRESS["t1"]["t"]
+    with pytest.raises(ToolError, match="bağlantı"):
+        run_tool("media_download", [], tmp_path, url="")
+    with pytest.raises(ToolError, match="Geçersiz"):
+        run_tool("media_download", [], tmp_path, url="youtube.com/watch?v=x")
+    with pytest.raises(ToolError, match="başarısız"):
+        run_tool("media_download", [], tmp_path, url=f"{local_http}/yok.mp4", kind="audio")
+
+
+def test_media_download_options_and_messages(tmp_path):
+    from donusturucu import download_tools as dl
+    job = Job(inputs=[], opts={"kind": "video", "quality": "720", "container": "mp4", "playlist": True, "max_items": 5,
+                               "cookies": "firefox", "subtitles": True}, out=tmp_path)
+    o = dl.build_options(job, tmp_path)
+    assert "height<=720" in o["format"] and o["merge_output_format"] == "mp4"
+    assert o["noplaylist"] is False and o["playlistend"] == 5 and o["cookiesfrombrowser"] == ("firefox",)
+    assert any(p["key"] == "FFmpegEmbedSubtitle" for p in o["postprocessors"]) and o["windowsfilenames"]
+    with pytest.raises(ToolError):
+        dl.build_options(Job(inputs=[], opts={"cookies": "netscape"}, out=tmp_path), tmp_path)
+    assert "robot" in dl._friendly("ERROR: [youtube] x: Sign in to confirm you’re not a bot")
+    assert "gizli" in dl._friendly("ERROR: Private video. Sign in if you've been granted access")
+
+
+def test_downloader_update_uses_newer_wheel(tmp_path, monkeypatch):
+    """PyPI yanıtı taklit edilir; yeni wheel ayar klasörüne iner, eskisi silinir."""
+    from donusturucu import download_tools as dl
+    monkeypatch.setattr(dl, "config_dir", lambda: tmp_path)
+    import io as _io
+    buf = _io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("yt_dlp/__init__.py", "")
+    wheel_bytes = buf.getvalue()
+
+    class R:
+        def __init__(self, data): self.data = data
+        def json(self): return self.data
+        @property
+        def content(self): return wheel_bytes
+
+    def fake_get(url, timeout=0):
+        if url.endswith("/json"):
+            pkg = url.split("/pypi/")[1].split("/")[0]
+            fn = pkg.replace("-", "_") + "-2099.1.1-py3-none-any.whl"
+            return R({"info": {"version": "2099.1.1"}, "urls": [{"packagetype": "bdist_wheel", "filename": fn, "url": "x"}]})
+        return R(None)
+
+    import requests
+    monkeypatch.setattr(requests, "get", fake_get)
+    (tmp_path / "indirici").mkdir()
+    (tmp_path / "indirici" / "yt_dlp-2000.1.1-py3-none-any.whl").write_bytes(wheel_bytes)
+    r = dl.update_downloader(force=True)
+    names = sorted(p.name for p in (tmp_path / "indirici").glob("*.whl"))
+    assert r["surum"] == "2099.1.1" and names == ["yt_dlp-2099.1.1-py3-none-any.whl", "yt_dlp_ejs-2099.1.1-py3-none-any.whl"]
+    assert dl.update_downloader(force=False)["durum"] == "yakın zamanda kontrol edildi"

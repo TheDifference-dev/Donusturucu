@@ -15,4 +15,6 @@ waitress>=3.0
 requests>=2.31
 anthropic>=2.6
 deep-translator>=1.11
+yt-dlp[default]>=2026.10.26
+deno>=2.5
 pywin32>=306; sys_platform == "win32"

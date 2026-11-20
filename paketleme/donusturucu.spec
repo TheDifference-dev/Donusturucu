@@ -7,12 +7,19 @@ from PyInstaller.utils.hooks import collect_all
 ROOT = Path(SPECPATH).parent
 datas, binaries, hidden = [(str(ROOT / "donusturucu" / "static"), "donusturucu/static")], [], []
 for pkg in ["pymupdf", "pymupdf_fonts", "pymupdf4llm", "pymupdf_layout", "imageio_ffmpeg", "docx", "pptx",
-            "pdf2docx", "openpyxl", "pikepdf", "webview", "deep_translator", "anthropic", "certifi"]:
+            "pdf2docx", "openpyxl", "pikepdf", "webview", "deep_translator", "anthropic", "certifi",
+            "yt_dlp", "yt_dlp_ejs"]:
     try:
         d, b, h = collect_all(pkg)
         datas += d; binaries += b; hidden += h
     except Exception as e:
         print("atlandı:", pkg, e)
+# YouTube imza çözümü için deno (pip paketi ikili dosyayı Scripts/ altına kurar)
+try:
+    import deno
+    binaries.append((deno.find_deno_bin(), "deno_bin"))
+except Exception as e:
+    print("UYARI: deno pakete eklenemedi:", e)
 hidden += ["waitress", "flask", "cv2", "numpy", "PIL.ImageCms", "donusturucu.server", "donusturucu.registry"]
 if sys.platform == "win32":
     hidden += ["win32com", "win32com.client", "pythoncom", "pywintypes", "clr_loader", "pythonnet"]

@@ -155,4 +155,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 24px; }
 .yes { color: var(--ok); font-weight: 600; } .no { color: var(--muted); }
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 10px; z-index: 60; }
 video.cam { width: 100%; border-radius: 10px; background: #000; }
+.urlbox { width: 100%; min-height: 96px; margin-top: 6px; padding: 12px 14px; border-radius: 12px; border: 2px solid var(--border);
+  background: var(--surface-2); font: 15px/1.5 ui-monospace, Consolas, monospace; resize: vertical; }
+.urlbox:focus { outline: none; border-color: var(--accent); }
 .fieldlist { display: flex; flex-direction: column; gap: 10px; }

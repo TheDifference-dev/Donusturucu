@@ -134,6 +134,9 @@ def stem(p: Path | str) -> str:
 
 
 # ---------------------------------------------------------------- iş bağlamı
+PROGRESS: dict[str, dict] = {}   # job_id → {"p": 0..1, "t": "metin"}
+
+
 @dataclass
 class Job:
     inputs: list[Path]
@@ -141,6 +144,12 @@ class Job:
     out: Path
     store: FileStore | None = None
     extra: dict = field(default_factory=dict)   # ör. imza görselleri {id: Path}
+    job_id: str | None = None                   # arayüz ilerleme durumunu bununla sorar
+
+    def progress(self, fraction: float | None, text: str = "") -> None:
+        if self.job_id:
+            PROGRESS[self.job_id] = {"p": None if fraction is None else max(0.0, min(1.0, fraction)),
+                                     "t": text, "at": time.time()}
 
     def opt(self, key, default=None):
         v = self.opts.get(key, default)

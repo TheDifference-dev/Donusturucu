@@ -176,6 +176,28 @@ def selftest() -> int:
         ok = r.status_code == 200 and j.get("files")
         bad += 0 if ok else 1
         print(("OK   " if ok else "HATA ") + tid + ("" if ok else f" → {j.get('error')}"), flush=True)
+    # bağlantıdan indirme: yerel HTTP sunucusundan (YouTube'a gitmeden) indir + MP3'e çevir
+    import functools
+    import http.server
+    h = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(tmp))
+    h.log_message = lambda *a, **k: None
+    hs = http.server.ThreadingHTTPServer(("127.0.0.1", 0), h)
+    threading.Thread(target=hs.serve_forever, daemon=True).start()
+    os.environ["NO_PROXY"] = "127.0.0.1,localhost"
+    r = c.post("/api/run/media_download", json={"opts": {"url": f"http://127.0.0.1:{hs.server_address[1]}/ton.mp4",
+                                                         "kind": "audio", "audio_format": "mp3"}})
+    j = r.get_json()
+    ok = r.status_code == 200 and j.get("files") and j["files"][0]["name"].endswith(".mp3")
+    bad += 0 if ok else 1
+    print(("OK   " if ok else "HATA ") + "media_download" + ("" if ok else f" → {j.get('error')}"), flush=True)
+    hs.shutdown()
+    from donusturucu.download_tools import find_js_runtime, load_ytdlp
+    js = find_js_runtime()
+    ok = bool(js) and subprocess.run([js, "--version"], capture_output=True,
+                                     **({"creationflags": 0x08000000} if core.SYSTEM == "Windows" else {})).returncode == 0
+    bad += 0 if ok else 1
+    print(("OK   " if ok else "HATA ") + f"deno ({js})", flush=True)
+    print("     yt-dlp", load_ytdlp().version.__version__, load_ytdlp().__file__, flush=True)
     r = c.get("/")
     print(("OK   " if r.status_code == 200 else "HATA ") + "arayüz", flush=True)
     bad += r.status_code != 200
@@ -202,6 +224,11 @@ def main():
         return
 
     app, srv, url = start_server(a.port)
+    try:   # YouTube indiricisini günde bir kez arka planda güncelle
+        from donusturucu.download_tools import auto_update_in_background
+        auto_update_in_background()
+    except Exception:
+        pass
     print(f"{core.APP_NAME} çalışıyor: {url}", flush=True)
     try:
         if not a.no_window and not a.browser and run_desktop(app, srv, url):

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from . import ai_tools as ai
 from . import convert_tools as cv
+from . import download_tools as dl
 from . import media_tools as md
 from . import pdf_tools as pt
 
@@ -52,6 +53,32 @@ TOOLS = [
                o("samplerate", "Örnekleme hızı", "select", "auto", [["auto", "Kaynakla aynı"], ["44100", "44.1 kHz"], ["48000", "48 kHz"], ["22050", "22 kHz"]]),
                o("mono", "Mono'ya çevir", "checkbox", False),
                o("normalize", "Ses seviyesini dengele (normalize)", "checkbox", False)]),
+
+    dict(id="media_download", cat="media", icon="▶", fn=dl.media_download, ui="url",
+         title="YouTube'dan İndir",
+         desc="YouTube (ve 1000+ site) bağlantısından videoyu MP4 ya da sesi MP3/M4A olarak indirin. Oynatma listesi desteklenir.",
+         accept=[], multi=False, optional_files=True,
+         opts=[o("url", "Video bağlantısı (her satıra bir tane)", "textarea", "", main=True,
+                 placeholder="https://www.youtube.com/watch?v=…"),
+               o("kind", "Ne indirilsin?", "radio", "video", [["video", "Video (görüntü + ses)"], ["audio", "Sadece ses"]]),
+               o("quality", "Video kalitesi", "select", "1080", [["best", "En iyi"], ["2160", "4K (2160p)"], ["1440", "1440p"],
+                                                               ["1080", "1080p (önerilen)"], ["720", "720p"], ["480", "480p"], ["360", "360p"]],
+                 show_if={"kind": ["video"]}),
+               o("container", "Video biçimi", "select", "mp4", [["mp4", "MP4 (her yerde açılır)"], ["mkv", "MKV (en yüksek kalite)"]],
+                 show_if={"kind": ["video"]}),
+               o("subtitles", "Altyazıyı ekle (Türkçe/İngilizce varsa)", "checkbox", False, show_if={"kind": ["video"]}),
+               o("audio_format", "Ses biçimi", "select", "mp3", [["mp3", "MP3"], ["m4a", "M4A (AAC)"], ["opus", "OPUS"],
+                                                                 ["flac", "FLAC (kayıpsız)"], ["wav", "WAV (kayıpsız)"]],
+                 show_if={"kind": ["audio"]}),
+               o("bitrate", "Ses kalitesi", "select", "192", [["128", "128 kbps"], ["192", "192 kbps (önerilen)"], ["256", "256 kbps"], ["320", "320 kbps"]],
+                 show_if={"kind": ["audio"], "audio_format": ["mp3", "m4a", "opus"]}),
+               o("metadata", "Başlık ve kapak resmini dosyaya ekle", "checkbox", True),
+               o("playlist", "Bağlantı bir oynatma listesiyse tamamını indir", "checkbox", False),
+               o("max_items", "Listeden en fazla kaç video", "number", 25, min=1, max=500, show_if={"playlist": [True, "true"]}),
+               o("cookies", "Tarayıcı çerezlerini kullan", "select", "none",
+                 [["none", "Kullanma"], ["firefox", "Firefox"], ["edge", "Microsoft Edge"], ["chrome", "Google Chrome"],
+                  ["brave", "Brave"], ["opera", "Opera"]],
+                 help="YouTube 'robot değilim' doğrulaması ya da yaş sınırı çıkarırsa, YouTube'a giriş yaptığınız tarayıcıyı seçin.")]),
 
     # ------------------------------------------------------------ DÜZENLE
     dict(id="merge", cat="organize", icon="⧉", fn=pt.merge, title="PDF Birleştir",
