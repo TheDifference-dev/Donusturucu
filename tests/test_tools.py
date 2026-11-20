@@ -378,6 +378,7 @@ def test_downloader_update_uses_newer_wheel(tmp_path, monkeypatch):
     """PyPI yanıtı taklit edilir; yeni wheel ayar klasörüne iner, eskisi silinir."""
     from donusturucu import download_tools as dl
     monkeypatch.setattr(dl, "config_dir", lambda: tmp_path)
+    monkeypatch.setattr(sys, "path", list(sys.path))   # sahte wheel'ler diğer testlere sızmasın
     import io as _io
     buf = _io.BytesIO()
     with zipfile.ZipFile(buf, "w") as z:
@@ -403,5 +404,31 @@ def test_downloader_update_uses_newer_wheel(tmp_path, monkeypatch):
     (tmp_path / "indirici" / "yt_dlp-2000.1.1-py3-none-any.whl").write_bytes(wheel_bytes)
     r = dl.update_downloader(force=True)
     names = sorted(p.name for p in (tmp_path / "indirici").glob("*.whl"))
-    assert r["surum"] == "2099.1.1" and names == ["yt_dlp-2099.1.1-py3-none-any.whl", "yt_dlp_ejs-2099.1.1-py3-none-any.whl"]
+    assert r["surum"] == "2099.1.1"
+    assert {"yt_dlp-2099.1.1-py3-none-any.whl", "yt_dlp_ejs-2099.1.1-py3-none-any.whl"} <= set(names)
+    # eski sürüm silinmiş olmalı; Windows'ta kilitliyse kalabilir ama artık öne alınan en yenisidir
+    dl._activate_updates()
+    assert sys.path[0].endswith("2099.1.1-py3-none-any.whl")
     assert dl.update_downloader(force=False)["durum"] == "yakın zamanda kontrol edildi"
+
+
+def test_downloader_update_with_locked_old_wheel(tmp_path, monkeypatch):
+    """Windows'ta kullanımdaki eski wheel silinemez: güncelleme yine başarılı olmalı,
+    sonraki açılışta en yeni wheel öne alınmalı."""
+    from donusturucu import download_tools as dl
+    import pathlib
+    monkeypatch.setattr(dl, "config_dir", lambda: tmp_path)
+    d = tmp_path / "indirici"; d.mkdir()
+    old = d / "yt_dlp-2000.1.1-py3-none-any.whl"; old.write_bytes(b"x")
+    new = d / "yt_dlp-2099.1.1-py3-none-any.whl"; new.write_bytes(b"y")
+    real_unlink = pathlib.Path.unlink
+
+    def locked(self, missing_ok=False):
+        if "2000.1.1" in self.name:
+            raise PermissionError(32, "being used by another process")
+        return real_unlink(self, missing_ok=missing_ok)
+
+    monkeypatch.setattr(pathlib.Path, "unlink", locked)
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    dl._activate_updates()
+    assert sys.path[0] == str(new) and str(old) not in sys.path and old.exists()

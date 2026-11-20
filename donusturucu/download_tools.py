@@ -35,12 +35,31 @@ def _update_dir() -> Path:
     return d
 
 
+def _wheels_by_package() -> dict[str, list[Path]]:
+    """Ayar klasöründeki wheel'ler, paket adına göre, eskiden yeniye sıralı."""
+    groups: dict[str, list[Path]] = {}
+    for w in _update_dir().glob("*.whl"):
+        groups.setdefault(w.name.split("-")[0], []).append(w)
+    for k in groups:
+        groups[k].sort(key=lambda w: _ver_tuple(w.name.split("-")[1]))
+    return groups
+
+
+def _try_unlink(p: Path) -> None:
+    try:
+        p.unlink(missing_ok=True)
+    except OSError:   # Windows: kullanımdaki wheel kilitli; bir sonraki açılışta silinir
+        pass
+
+
 def _activate_updates() -> None:
-    """Ayar klasöründe daha yeni yt-dlp tekerleği (wheel) varsa onu içe aktarma yoluna öne koyar."""
-    for wheel in sorted(_update_dir().glob("*.whl")):
-        p = str(wheel)
-        if p not in sys.path:
-            sys.path.insert(0, p)
+    """Her paketin en yeni wheel'ini içe aktarma yoluna öne koyar, eskileri temizler."""
+    for wheels in _wheels_by_package().values():
+        for old in wheels[:-1]:
+            _try_unlink(old)
+        newest = str(wheels[-1])
+        if newest not in sys.path:
+            sys.path.insert(0, newest)
 
 
 def load_ytdlp():
@@ -104,10 +123,10 @@ def update_downloader(force=False, timeout=20) -> dict:
             if z.testzip() is not None:
                 tmp.unlink(missing_ok=True)
                 raise ToolError("İndirilen güncelleme bozuk.")
-        prefix = pkg.replace("-", "_") + "-"
-        for old in _update_dir().glob(prefix + "*.whl"):
-            old.unlink(missing_ok=True)
         tmp.replace(target)
+        for old in _wheels_by_package().get(pkg.replace("-", "_"), []):
+            if old != target:
+                _try_unlink(old)
         if pkg == "yt-dlp":
             result = {"durum": "güncellendi — uygulamayı kapatıp açın", "surum": latest}
     stamp.write_text(json.dumps({"t": time.time()}))
